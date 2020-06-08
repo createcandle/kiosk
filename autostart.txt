@@ -1,0 +1,49 @@
+#!/bin/bash
+
+sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' ~/.config/chromium/'Local State'
+sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[^"]\+"/"exit_type":"Normal"/' ~/.config/chromium/Default/Preferences
+#feh --bg-fill /boot/splash.png
+windowsize=$(xdpyinfo | awk '/dimensions/{print $2}')
+echo "$windowsize" > /home/pi/candle/resolution.txt
+sed -i 's/x/ /' /home/pi/candle/resolution.txt
+resolution=$(cat /home/pi/candle/resolution.txt)
+if [ -f /boot/splash.mp4 ]
+then
+  omxplayer --win "0 0 $resolution" --loop /boot/splash.mp4 &
+fi
+sleep 1
+
+
+if [ ! -s /boot/candle_kiosk.txt ]
+then
+	echo "The candle_kiosk.txt file was empty, so not loading the browser" >> /var/log/syslog
+    exit 0
+fi
+
+file="/boot/candle_kiosk.txt"
+url=$(cat "$file")
+
+if [ ! -n "$url" ]
+then
+	echo "The candle_kiosk.txt file was empty, so not loading the browser" >> /var/log/syslog
+    exit 0
+fi
+
+# --enable-touchview
+chromium --no-sandbox --kiosk /home/pi/candle/tab1.html --load-extension=/home/pi/candle/virtual_keyboard --no-crash-upload --force-tablet-mode --enable-touchview --enable-virtual-keyboard --disable-translate --enable-input --enable-top-drag-gesture --pull-to-refresh=2 --progress-bar-animation --default-background-color=00000000 --no-first-run &
+xdotool search --classname --sync Chromium getwindowpid > /home/pi/candle/chromiumpid.txt
+until $(curl --output /dev/null --silent --head --fail $url); do
+    sleep 1
+done
+windowid=$(wmctrl -l | awk '{print $1;}')
+chromium --no-sandbox --new-window $url &
+sleep 2
+xdotool windowclose $windowid
+sleep 2
+wmctrl -s 1
+wmctrl -s 0
+sleep 3
+wmctrl -s 1
+xdotool key F5
+sleep 1
+pkill omxplayer
