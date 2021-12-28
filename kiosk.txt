@@ -26,10 +26,10 @@ echo "
   depending on your device and internet speed.
 
 
-  Starting in 15 seconds...
+  Starting in 5 seconds...
 
 "
-sleep 15
+sleep 5
 
 
 
@@ -40,6 +40,9 @@ sleep 15
 
 # Set a locale
 export LC_ALL="en_GB.UTF-8"
+
+# remove old .Xauthority file if it exists
+#rm /home/pi/.Xauthority
 
 
 # Create Candle directory
@@ -52,43 +55,46 @@ echo ""
 echo "1 (of 7). Inquiring about the latest software versions"
 echo ""
 sleep 2
-apt-get update
+apt-get update --allow-releaseinfo-change
 
 
-clear
+#clear
 echo ""
 echo "2 (of 7). Installing the minimal desktop"
 echo ""
 sleep 2
-apt-get install --no-install-recommends xserver-xorg x11-xserver-utils xinit openbox wmctrl xdotool feh omxplayer fbi ttf-mscorefonts-installer unclutter xfonts-base libinput-tools -y
+# xorgxrdp 
+apt-get install --no-install-recommends xserver-xorg x11-xserver-utils xserver-xorg-legacy xinit openbox wmctrl xdotool feh omxplayer fbi unclutter lsb-release xfonts-base libinput-tools -y
 
 
 # Remove all the keyboard shortcuts from Openbox, replace them with a simpler file
-if [ -f /etc/xdg/openbox/rc.xml ]
-then
-mv -n /etc/xdg/openbox/rc.xml /etc/xdg/openbox/rc-bak.xml
-wget https://www.candlesmarthome.com/tools/rc.xml -P /etc/xdg/openbox/
-fi
+# temporarily disabled
+
+#if [ -f /etc/xdg/openbox/rc.xml ]
+#then
+#mv -n /etc/xdg/openbox/rc.xml /etc/xdg/openbox/rc-bak.xml
+#wget https://www.candlesmarthome.com/tools/rc.xml -P /etc/xdg/openbox/
+#fi
 
 
-clear
+#clear
 echo ""
 echo "3 (of 7). Downloading the Ungoogled Chriomium browser"
 echo ""
 sleep 2
-wget https://download.opensuse.org/repositories/home:/ungoogled_chromium/Raspbian_Buster/armhf/ungoogled-chromium-common_81.0.4044.138-1.buster1_armhf.deb
-wget https://download.opensuse.org/repositories/home:/ungoogled_chromium/Raspbian_Buster/armhf/ungoogled-chromium_81.0.4044.138-1.buster1_armhf.deb
-wget https://download.opensuse.org/repositories/home:/ungoogled_chromium/Raspbian_Buster/armhf/ungoogled-chromium-sandbox_81.0.4044.138-1.buster1_armhf.deb
+wget https://candlesmarthome.com/tools/ungoogled-chromium-common_83.0.4103.116-1.buster1_armhf.deb
+wget https://candlesmarthome.com/tools/ungoogled-chromium_83.0.4103.116-1.buster1_armhf.deb
+wget https://candlesmarthome.com/tools/ungoogled-chromium-sandbox_83.0.4103.116-1.buster1_armhf.deb
 
 
-clear
+#clear
 echo ""
 echo "4 (of 7). Installing the Ungoogled Chriomium browser"
 echo ""
 sleep 2
-apt-get --no-install-recommends install ./ungoogled-chromium-common_81.0.4044.138-1.buster1_armhf.deb -y
-apt-get --no-install-recommends install ./ungoogled-chromium_81.0.4044.138-1.buster1_armhf.deb -y
-apt-get --no-install-recommends install ./ungoogled-chromium-sandbox_81.0.4044.138-1.buster1_armhf.deb -y
+apt-get --no-install-recommends install ./ungoogled-chromium-common_83.0.4103.116-1.buster1_armhf.deb -y
+apt-get --no-install-recommends install ./ungoogled-chromium_83.0.4103.116-1.buster1_armhf.deb -y
+apt-get --no-install-recommends install ./ungoogled-chromium-sandbox_83.0.4103.116-1.buster1_armhf.deb -y
 
 
 # Just to be safe, let's try to fix the installation
@@ -96,11 +102,16 @@ apt-get install --fix-missing
 apt --fix-broken install -y
 
 
+# Add policy file to disable things like file selection
+mkdir -p /etc/chromium/policies/managed/
+echo '{"AllowFileSelectionDialogs": false, "AudioCaptureAllowed": false}' > /etc/chromium/policies/managed/candle.json
+
+
 # Clean up old installation files
 rm -f ungoogled*.deb
 
 
-clear
+#clear
 echo ""
 echo "5 (of 7). Downloading virtual keyboard extension for browser"
 echo ""
@@ -110,7 +121,7 @@ unzip -o /home/pi/candle/virtual_keyboard.zip -d /home/pi/candle/
 rm -f /home/pi/candle/virtual_keyboard.zip
 
 
-clear
+#clear
 echo ""
 echo "6 (of 7). Installing Candle startup images"
 echo ""
@@ -145,7 +156,7 @@ fi
 
 
 # Download file that will be opened in the initial tab. This should never be shown, but is needed to get Chromium started.
-wget https://www.candlesmarthome.com/tools/tab1.html -P /home/pi/candle/
+#wget https://www.candlesmarthome.com/tools/tab1.html -P /home/pi/candle/
 
 
 
@@ -154,7 +165,7 @@ wget https://www.candlesmarthome.com/tools/tab1.html -P /home/pi/candle/
 #
 # 2. Create settings files
 #
-clear
+#clear
 echo ""
 echo "8 (of 7). Creating settings files"
 echo ""
@@ -176,17 +187,26 @@ echo "- Creating xinitrc file"
 echo 'exec openbox-session' > /etc/X11/xinit/xinitrc
 
 
+
+# Modify the xinitrc file to automatically log in the pi user
+echo "- Creating xwrapper.config file"
+echo "allowed_users=anybody" > /etc/X11/Xwrapper.config
+echo "needs_root_rights=yes" >> /etc/X11/Xwrapper.config
+
 # Set rc.local to check if the candle_kiosk.txt file is present. Only boot into the fullscreen browser if it is.
 echo "- Creating rc.local file"
 echo '#!/bin/bash' > /etc/rc.local
 echo 'if [ -f /boot/candle_kiosk.txt ]' >> /etc/rc.local
 echo 'then' >> /etc/rc.local
+#echo '  chmod g+r /dev/tty2' >> /etc/rc.local
+#echo '  chmod ug+s /usr/lib/xorg/Xorg' >> /etc/rc.local
 echo '  if [ -n "$(ls /dev/input/by-id/*-mouse 2>/dev/null)" ]' >> /etc/rc.local
 echo '  then' >> /etc/rc.local
-echo '   startx &' >> /etc/rc.local
-echo '   unclutter -idle 10 -root &' >> /etc/rc.local
+echo '   su - pi -c startx &' >> /etc/rc.local
+echo "   su - pi -c 'unclutter -idle 10 -root -display :0 &'" >> /etc/rc.local
 echo '  else' >> /etc/rc.local
-echo '   startx -- -nocursor &' >> /etc/rc.local
+echo "   su - pi -c 'startx -- -nocursor &'" >> /etc/rc.local
+echo "   su - pi -c 'unclutter -idle 0 -root -display :0 &'" >> /etc/rc.local
 echo '  fi' >> /etc/rc.local
 echo 'fi' >> /etc/rc.local
 echo 'exit 0' >> /etc/rc.local
@@ -235,7 +255,11 @@ fi
 
 # Set ownership of files in Candle folder to pi user
 echo "- Setting candle directory ownership to pi user"
-chown -R pi /home/pi/candle
+#chown -R pi /home/pi/candle
+chown -R pi /home/pi
+
+# allow Pi user to access tty, so that startX will boot.
+#gpasswd -a pi tty
 
 
 # Hide the login text (it will still be available on tty3 - connect a keyboard to your pi and press CTRl-ALT-F3 to see it)
@@ -243,7 +267,8 @@ systemctl enable getty@tty3.service
 systemctl disable getty@tty1.service
 
 
-clear
+
+#clear
 echo "
 
 
